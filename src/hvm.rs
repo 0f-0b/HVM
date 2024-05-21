@@ -890,7 +890,7 @@ impl TMem {
     }
   }
 
-  pub fn evaluator(&mut self, net: &GNet, book: &Book) {
+  pub fn evaluator(&mut self, net: &GNet, book: &Book) -> bool {
     // Increments the tick
     self.tick += 1;
 
@@ -901,7 +901,9 @@ impl TMem {
 
     // Performs some interactions
     while self.rbag.len() > 0 {
-      self.interact(net, book);
+      if !self.interact(net, book) {
+        return false;
+      }
 
       // DEBUG:
       //println!("{}{}", self.rbag.show(), net.show());
@@ -932,6 +934,7 @@ impl TMem {
 
     net.itrs.fetch_add(self.itrs as u64, Ordering::Relaxed);
     self.itrs = 0;
+    true
   }
 }
 
