@@ -87,11 +87,9 @@ pub struct RBag {
 }
 
 // Global Net
-pub struct GNet<'a> {
-  pub nlen: usize, // length of the node buffer
-  pub vlen: usize, // length of the vars buffer
-  pub node: &'a mut [APair], // node buffer
-  pub vars: &'a mut [APort], // vars buffer
+pub struct GNet {
+  pub node: Box<[APair]>, // node buffer
+  pub vars: Box<[APort]>, // vars buffer
   pub itrs: AtomicU64, // interaction count
 }
 
@@ -451,15 +449,11 @@ impl RBag {
   }
 }
 
-impl<'a> GNet<'a> {
+impl GNet {
   pub fn new(nlen: usize, vlen: usize) -> Self {
-    let nlay = Layout::array::<APair>(nlen).unwrap();
-    let vlay = Layout::array::<APort>(vlen).unwrap();
-    let nptr = unsafe { alloc(nlay) as *mut APair };
-    let vptr = unsafe { alloc(vlay) as *mut APort };
-    let node = unsafe { std::slice::from_raw_parts_mut(nptr, nlen) };
-    let vars = unsafe { std::slice::from_raw_parts_mut(vptr, vlen) };
-    GNet { nlen, vlen, node, vars, itrs: AtomicU64::new(0) }
+    let node = (0..nlen).map(|_| APair(AtomicU64::new(0))).collect();
+    let vars = (0..vlen).map(|_| APort(AtomicU32::new(0))).collect();
+    GNet { node, vars, itrs: AtomicU64::new(0) }
   }
 
   pub fn node_create(&self, loc: usize, val: Pair) {
@@ -528,18 +522,6 @@ impl<'a> GNet<'a> {
 
 }
 
-impl<'a> Drop for GNet<'a> {
-  fn drop(&mut self) {
-    let nlay = Layout::array::<APair>(self.nlen).unwrap();
-    let vlay = Layout::array::<APair>(self.vlen).unwrap();
-    unsafe {
-      dealloc(self.node.as_mut_ptr() as *mut u8, nlay);
-      dealloc(self.vars.as_mut_ptr() as *mut u8, vlay);
-    }
-  }
-
-}
-
 impl TMem {
   // TODO: implement a TMem::new() fn
   pub fn new(tid: u32, tids: u32) -> Self {
@@ -558,10 +540,11 @@ impl TMem {
 
   pub fn node_alloc(&mut self, net: &GNet, num: usize) -> usize {
     let mut got = 0;
-    for _ in 0..net.nlen {
+    let nlen = net.node.len();
+    for _ in 0..nlen {
       self.nput += 1; // index 0 reserved
-      if self.nput < net.nlen-1 || net.is_node_free(self.nput % net.nlen) {
-        self.nloc[got] = self.nput % net.nlen;
+      if self.nput < nlen || net.is_node_free(self.nput % nlen) {
+        self.nloc[got] = self.nput % nlen;
         got += 1;
         //println!("ALLOC NODE {} {}", got, self.nput);
       }
@@ -574,10 +557,11 @@ impl TMem {
 
   pub fn vars_alloc(&mut self, net: &GNet, num: usize) -> usize {
     let mut got = 0;
-    for _ in 0..net.vlen {
+    let vlen = net.vars.len();
+    for _ in 0..vlen {
       self.vput += 1; // index 0 reserved for FREE
-      if self.vput < net.vlen-1 || net.is_vars_free(self.vput % net.vlen) {
-        self.vloc[got] = self.vput % net.nlen;
+      if self.vput < vlen || net.is_vars_free(self.vput % vlen) {
+        self.vloc[got] = self.vput % vlen;
         //println!("ALLOC VARS {} {}", got, self.vput);
         got += 1;
       }
@@ -1044,13 +1028,15 @@ impl RBag {
   }
 }
 
-impl<'a> GNet<'a> {
+impl GNet {
   pub fn show(&self) -> String {
+    let nlen = self.node.len();
+    let vlen = self.vars.len();
     let mut s = String::new();
     s.push_str("NODE | FST-PORT     | SND-PORT     \n");
     s.push_str("---- | ------------ | ------------\n");
     //for i in 0..256 {
-    for i in 0..self.nlen-1 {
+    for i in 0..nlen {
       let node = self.node_load(i);
       if node.0 != 0 {
         s.push_str(&format!("{:04X} | {} | {}\n", i, node.get_fst().show(), node.get_snd().show()));
@@ -1060,7 +1046,7 @@ impl<'a> GNet<'a> {
     s.push_str("VARS | VALUE        |\n");
     s.push_str("---- | ------------ |\n");
     //for i in 0..256 {
-    for i in 0..self.vlen-1 {
+    for i in 0..vlen {
       let var = self.vars_load(i);
       if var.0 != 0 {
         s.push_str(&format!("{:04X} | {} |\n", i, var.show()));
