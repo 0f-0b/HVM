@@ -173,7 +173,10 @@ pub fn run(book: &hvm::Book) {
   let start = std::time::Instant::now();
 
   // Evaluates
-  tm.evaluator(&net, &book);
+  if !tm.evaluator(&net, &book) {
+    println!("Out of memory");
+    return;
+  }
   
   // Stops the timer
   let duration = start.elapsed();
