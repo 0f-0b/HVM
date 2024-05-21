@@ -77,7 +77,7 @@ pub const FP_SHR : Tag = 0x16;
 
 // Constants
 pub const FREE : Port = Port(0x0);
-pub const ROOT : Port = Port(0xFFFFFFF8);
+pub const ROOT : Port = Port(0xFFFFFF8);
 pub const NONE : Port = Port(0xFFFFFFFF);
 
 // RBag
@@ -1055,7 +1055,7 @@ impl GNet {
         s.push_str(&format!("{:04X} | {} |\n", i, var.show()));
       }
     }
-    let root = self.vars_load(0x1FFFFFFF);
+    let root = self.vars_load(0x1FFFFFF);
     s.push_str(&format!("ROOT | {} |\n", root.show()));
     s.push_str("==== | ============ |\n");
     return s;

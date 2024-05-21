@@ -159,7 +159,7 @@ fn main() {
 
 pub fn run(book: &hvm::Book) {
   // Initializes the global net
-  let net = hvm::GNet::new(1 << 29, 1 << 29);
+  let net = hvm::GNet::new(0x2000000, 0x2000000);
 
   // Initializes threads
   let mut tm = hvm::TMem::new(0, 1);
